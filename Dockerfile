@@ -1,25 +1,23 @@
-# Use an official Node.js image as the base image
-FROM node:16
+# Use an official Node.js image with Bullseye (newer Debian)
+FROM node:16-bullseye
 
 # Install Git and Supervisor
-RUN apt-get update && apt-get install -y git supervisor
+RUN apt-get update && apt-get install -y git supervisor && rm -rf /var/lib/apt/lists/*
 
-# Set the working directory in the Docker image
+# Set working directory
 WORKDIR /app
 
-# Clone your GitHub repository into the Docker image
-RUN git clone https://github.com/sunilkumarsukesan/Testleaf-pos.git
+# Clone your GitHub repository directly into /app
+RUN git clone https://github.com/Your-UserName/Testleaf-pos .
 
-# Optionally, specify the branch or commit you want to clone
-CMD cd Testleaf-pos
-RUN git pull
-
-# Install project dependencies in the root directory and api directory
+# Install dependencies for the root project
 RUN npm install
+
+# Install dependencies for the API
 WORKDIR /app/api
 RUN npm install
 
-# Create a Supervisor configuration file
+# Create Supervisor config for web and api services
 RUN mkdir -p /etc/supervisor/conf.d
 RUN echo "[supervisord]\n\
 nodaemon=true\n\
@@ -38,9 +36,10 @@ command=npm run dev:api\n\
 autostart=true\n\
 autorestart=true\n\
 stderr_logfile=/var/log/api.err.log\n\
-stdout_logfile=/var/log/api.out.log\n" > /etc/supervisor/conf.d/supervisord.conf
+stdout_logfile=/var/log/api.out.log\n" \
+> /etc/supervisor/conf.d/supervisord.conf
 
-# Expose the ports that the services will run on
+# Expose ports
 EXPOSE 80 3500
 
 # Start Supervisor to run both services
