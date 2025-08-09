@@ -8,7 +8,7 @@ RUN apt-get update && apt-get install -y git supervisor && rm -rf /var/lib/apt/l
 WORKDIR /app
 
 # Clone your GitHub repository directly into /app
-RUN git clone https://github.com/Your-UserName/Testleaf-pos .
+RUN git clone https://github.com/sunilkumarsukesan/Testleaf-pos.git
 
 # Install dependencies for the root project
 RUN npm install
