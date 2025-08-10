@@ -1,93 +1,52 @@
-# ---------- Stage 1: Build & Run on a specific Linux VM ----------
+# ---------- Stage 1: Build & Run on a specific Linux VM (no zipping) ----------
 variables:
-  # --- Docker / App ---
-  containerName: 'pos-system-app'       # ONLY this container will be stopped/removed if present
+  # --- Docker/App (edit these as needed) ---
+  containerName: 'pos-system-app'        # the ONLY container we'll stop/remove (if it exists)
   imageName: 'pos-system-app'
   tag: 'latest'
   portHttp: '80:80'
   portApi: '3500:3500'
-  healthUrl: 'http://localhost:80'      # change if your app exposes a different URL/port
+  healthUrl: 'http://localhost:80'       # optional health check
 
-  # --- Remote VM (create an SSH service connection in Azure DevOps) ---
-  sshServiceConnection: 'MyLinuxVM-SSH' # <== name of your SSH service connection
-  remoteWorkDir: '/home/azureuser/pos-app'  # where code will be unpacked/built on the VM
-  zipName: 'src.zip'
+  # --- Remote VM (SSH service connection you create in Azure DevOps) ---
+  sshServiceConnection: 'MyLinuxVM-SSH'  # name of your SSH service connection
+  remoteWorkDir: '/home/azureuser/'  # VM folder where Dockerfile & app live
 
 stages:
 - stage: Build_And_Run_On_VM
   displayName: 'Stage 1: Build & Run on VM'
   jobs:
-  - job: PushAndRun
-    displayName: 'Zip, Copy to VM, Build & Run'
+  - job: RunOnVM
+    displayName: 'Run Docker flow on VM'
     pool:
       vmImage: 'ubuntu-latest'
-
     steps:
-    - checkout: self
+    - checkout: none  # not copying code; we assume VM already has Dockerfile in remoteWorkDir
 
-    # 1) Archive repo (no root folder to keep paths clean)
-    - task: ArchiveFiles@2
-      displayName: 'Archive repo'
-      inputs:
-        rootFolderOrFile: '$(Build.SourcesDirectory)'
-        includeRootFolder: false
-        archiveType: 'zip'
-        archiveFile: '$(Build.ArtifactStagingDirectory)/$(zipName)'
-        replaceExistingArchive: true
-
-    # 2) Copy archive to VM
-    - task: CopyFilesOverSSH@0
-      displayName: 'Copy zip to VM'
-      inputs:
-        sshEndpoint: '$(sshServiceConnection)'
-        sourceFolder: '$(Build.ArtifactStagingDirectory)'
-        contents: '$(zipName)'
-        targetFolder: '$(remoteWorkDir)'
-        cleanTargetFolder: false
-        overwrite: true
-        readyTimeout: '20000'
-
-    # 3) SSH into VM and run docker flow (stop specific container, remove image, build, run, health-check)
     - task: SSH@0
-      displayName: 'Build & Run on VM (Docker)'
+      displayName: 'Build & run on VM'
       inputs:
         sshEndpoint: '$(sshServiceConnection)'
         runOptions: 'inline'
         inline: |
           set -e
 
-          # Ensure prerequisites
-          if ! command -v unzip >/dev/null 2>&1; then
-            sudo apt-get update -y
-            sudo apt-get install -y unzip
-          fi
-          if ! command -v docker >/dev/null 2>&1; then
-            sudo apt-get update -y
-            sudo apt-get install -y docker.io
-            sudo systemctl enable docker
-            sudo systemctl start docker
-          fi
-
-          # Prepare release dir
-          RELEASE_DIR="$(remoteWorkDir)/releases/$(Build.BuildId)"
-          mkdir -p "$RELEASE_DIR"
-          unzip -o "$(remoteWorkDir)/$(zipName)" -d "$RELEASE_DIR"
-          cd "$RELEASE_DIR"
+          # Go to your app folder (must contain Dockerfile)
+          cd "$(remoteWorkDir)"
 
           CONTAINER_NAME="$(containerName)"
           IMAGE_TAG="$(imageName):$(tag)"
 
-          echo "==> Stop/remove ONLY container named: $CONTAINER_NAME (if exists)"
+          echo "==> Stop/remove ONLY the container named: $CONTAINER_NAME (if present)"
           EXISTING_ID=$(sudo docker ps -aq --filter "name=^${CONTAINER_NAME}$" || true)
           if [ -n "$EXISTING_ID" ]; then
-            echo "Stopping $CONTAINER_NAME ($EXISTING_ID)"
             sudo docker stop "$EXISTING_ID"
             sudo docker rm "$EXISTING_ID"
           else
             echo "No existing container named $CONTAINER_NAME"
           fi
 
-          echo "==> Remove ONLY image: $IMAGE_TAG (if exists)"
+          echo "==> Remove ONLY the image: $IMAGE_TAG (if present)"
           IMG_ID=$(sudo docker images -q "$IMAGE_TAG" || true)
           if [ -n "$IMG_ID" ]; then
             sudo docker rmi -f "$IMG_ID"
@@ -105,24 +64,25 @@ stages:
             --name "$CONTAINER_NAME" \
             "$IMAGE_TAG"
 
-          echo "==> Running containers:"
+          echo "==> Containers now running:"
           sudo docker ps
 
-          # Optional health check
-          HEALTH_URL="$(healthUrl)"
-          echo "==> Health check: $HEALTH_URL"
-          ATTEMPTS=15
-          SLEEP_SEC=4
-          for i in $(seq 1 $ATTEMPTS); do
-            if curl -sSf "$HEALTH_URL" >/dev/null 2>&1; then
-              echo "✅ App is up at $HEALTH_URL"
-              exit 0
-            fi
-            echo "Waiting for app... ($i/$ATTEMPTS)"
-            sleep $SLEEP_SEC
-          done
-
-          echo "❌ App did not respond in time. Recent logs below:"
-          sudo docker ps --format 'table {{.Names}}\t{{.Status}}\t{{.Ports}}'
-          sudo docker logs "$CONTAINER_NAME" || true
-          exit 1
+          # Optional health check (disable by clearing healthUrl variable)
+          if [ -n "$(healthUrl)" ]; then
+            HEALTH_URL="$(healthUrl)"
+            echo "==> Health check: $HEALTH_URL"
+            ATTEMPTS=15
+            SLEEP_SEC=4
+            for i in $(seq 1 $ATTEMPTS); do
+              if curl -sSf "$HEALTH_URL" >/dev/null 2>&1; then
+                echo "✅ App responded at $HEALTH_URL"
+                exit 0
+              fi
+              echo "Waiting for app... ($i/$ATTEMPTS)"
+              sleep $SLEEP_SEC
+            done
+            echo "❌ App did not respond in time. Showing logs:"
+            sudo docker ps --format 'table {{.Names}}\t{{.Status}}\t{{.Ports}}'
+            sudo docker logs "$CONTAINER_NAME" || true
+            exit 1
+          fi
