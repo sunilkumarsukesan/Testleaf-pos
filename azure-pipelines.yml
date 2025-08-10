@@ -3,8 +3,8 @@ trigger: none
 # ---------- Stage 1: Build & Run on a specific Linux VM (no zipping) ----------
 variables:
   # --- Docker/App (edit these as needed) ---
-  containerName: 'pos-system-app'        # the ONLY container we'll stop/remove (if it exists)
-  imageName: 'pos-system-app:latest'
+  containerName: 'pos-system-app'   # <-- just the container name (no :tag)
+  imageName: 'pos-system-app'       # image repo/name
   tag: 'latest'
   portHttp: '80:80'
   portApi: '3500:3500'
