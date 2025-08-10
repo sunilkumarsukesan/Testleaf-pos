@@ -120,5 +120,36 @@ stages:
         mavenVersionOption: 'Default'
         mavenOptions: '-Xmx1024m'
 
-    # If you later want to enforce the Quality Gate in-pipeline,
-    # we can switch to SonarQubePrepare/Analyze/Publish tasks with a service connection.
+- stage: QA_Run_Tests
+  displayName: 'Stage 3: Run QA tests (mvn clean test)'
+  dependsOn: SonarQube_Static_Checks
+  condition: succeeded()
+  jobs:
+  - job: RunMavenTests
+    displayName: 'Maven test run'
+    pool:
+      vmImage: 'ubuntu-latest'
+    steps:
+    - checkout: qaRepo
+
+    - script: |
+        echo "##vso[task.setvariable variable=MAVEN_OPTS]-Dmaven.repo.local=$(MAVEN_CACHE_FOLDER)"
+      displayName: 'Set local Maven repo to cache path'
+
+    - task: Maven@4
+      displayName: 'mvn clean test'
+      inputs:
+        mavenPomFile: 'pom.xml'
+        goals: 'clean test'
+        publishJUnitResults: false
+        javaHomeOption: 'JDKVersion'
+        jdkVersionOption: '1.17'
+        mavenVersionOption: 'Default'
+        mavenOptions: '-Xmx1024m -Dmaven.wagon.http.pool=false'
+
+    # (Optional) Publish logs/artifacts
+    - task: PublishBuildArtifacts@1
+      displayName: 'Publish ExtentReports'
+      inputs:
+        pathtoPublish: '$(Build.SourcesDirectory)/reports'
+        artifactName: 'ExtentReports'
