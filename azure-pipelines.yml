@@ -1,6 +1,17 @@
 trigger: none
 
 # ---------- Stage 1: Build & Run on a specific Linux VM (no zipping) ----------
+
+
+resources:
+  repositories:
+  - repository: qaRepo
+    type: github
+    endpoint: sunilkumarsukesan            # GitHub service connection name
+    name: sunilkumarsukesan/pos-selenium-tests
+    ref: main                              # change if your default branch is different
+
+
 variables:
   # --- Docker/App (edit these as needed) ---
   containerName: 'pos-system-app'   # <-- just the container name (no :tag)
@@ -71,3 +82,43 @@ stages:
 
           # Success if we reached here
           exit 0
+
+- stage: SonarQube_Static_Checks
+  displayName: 'Stage 2: SonarQube static checks (QA Code)'
+  dependsOn: Build_And_Run_On_VM
+  condition: succeeded()
+  jobs:
+  - job: SonarScan
+    displayName: 'Run SonarQube analysis for pos-selenium'
+    pool:
+      vmImage: 'ubuntu-latest'
+    steps:
+    - checkout: qaRepo
+
+    # Make sure we have the right JDK version
+    - task: JavaToolInstaller@0
+      displayName: 'Set up Java 17'
+      inputs:
+        versionSpec: '17'
+        jdkArchitectureOption: 'x64'
+        jdkSourceOption: 'PreInstalled'
+
+    # Use Maven
+    - task: Maven@4
+      displayName: 'Maven: clean compile + Sonar'
+      inputs:
+        mavenPomFile: 'pom.xml'
+        goals: 'clean compile sonar:sonar'
+        options: >
+          -Dsonar.projectKey=pos-selenium
+          -Dsonar.projectName=pos-selenium
+          -Dsonar.host.url=http://98.70.57.201:9000
+          -Dsonar.token=$(SONAR_TOKEN)
+        publishJUnitResults: false
+        javaHomeOption: 'JDKVersion'
+        jdkVersionOption: '1.17'
+        mavenVersionOption: 'Default'
+        mavenOptions: '-Xmx1024m'
+
+    # If you later want to enforce the Quality Gate in-pipeline,
+    # we can switch to SonarQubePrepare/Analyze/Publish tasks with a service connection.
