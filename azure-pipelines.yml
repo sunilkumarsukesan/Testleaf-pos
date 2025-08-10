@@ -3,7 +3,7 @@ trigger: none
 # ---------- Stage 1: Build & Run on a specific Linux VM (no zipping) ----------
 variables:
   # --- Docker/App (edit these as needed) ---
-  containerName: 'pos-system-app'        # the ONLY container we'll stop/remove (if it exists)
+  containerName: 'pos-system-app:latest'        # the ONLY container we'll stop/remove (if it exists)
   imageName: 'pos-system-app'
   tag: 'latest'
   portHttp: '80:80'
@@ -48,11 +48,11 @@ stages:
           fi
 
           echo "==> Build image"
-          sudo docker build -t "$IMAGE_TAG" .
+          sudo docker build -t "$CONTAINER_NAME" .
 
           echo "==> Run container"
           sudo docker run -d \
             -p "$(portHttp)" \
             -p "$(portApi)" \
-            --name "$CONTAINER_NAME" \
-            "$IMAGE_TAG"
+            --name "$(imageName)" \
+            "$CONTAINER_NAME"
