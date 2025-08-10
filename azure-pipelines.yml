@@ -1,3 +1,5 @@
+trigger: none
+
 # ---------- Stage 1: Build & Run on a specific Linux VM (no zipping) ----------
 variables:
   # --- Docker/App (edit these as needed) ---
