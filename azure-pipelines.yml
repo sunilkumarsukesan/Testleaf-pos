@@ -7,7 +7,7 @@ resources:
   repositories:
   - repository: qaRepo
     type: github
-    endpoint: sunilkumarsukesan            # GitHub service connection name
+    endpoint: Github            # GitHub service connection name
     name: sunilkumarsukesan/pos-selenium-tests
     ref: main                              # change if your default branch is different
 
