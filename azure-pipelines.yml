@@ -3,8 +3,8 @@ trigger: none
 # ---------- Stage 1: Build & Run on a specific Linux VM (no zipping) ----------
 variables:
   # --- Docker/App (edit these as needed) ---
-  containerName: 'pos-system-app:latest'        # the ONLY container we'll stop/remove (if it exists)
-  imageName: 'pos-system-app'
+  containerName: 'pos-system-app'        # the ONLY container we'll stop/remove (if it exists)
+  imageName: 'pos-system-app:latest'
   tag: 'latest'
   portHttp: '80:80'
   portApi: '3500:3500'
@@ -28,30 +28,46 @@ stages:
       inputs:
         sshEndpoint: '$(sshServiceConnection)'
         runOptions: 'inline'
-        failOnStdErr: false
+        failOnStdErr: false                    # <-- prevents false failures from docker warnings
         inline: |
           set -e
 
-          # Go to your app folder (must contain Dockerfile)
           cd "$(remoteWorkDir)"
 
           CONTAINER_NAME="$(containerName)"
+          IMAGE_NAME="$(imageName)"
+          IMAGE_TAG="$(tag)"
+          IMAGE_REF="${IMAGE_NAME}:${IMAGE_TAG}"
 
-          echo "==> Stop/remove ONLY the container named: $CONTAINER_NAME (if present)"
-          EXISTING_ID=$(sudo docker ps -aq --filter "name=^${CONTAINER_NAME}$" || true)
+          echo "==> Stop/remove ONLY container: ${CONTAINER_NAME} (if present)"
+          EXISTING_ID=$(sudo -n docker ps -aq --filter "name=^${CONTAINER_NAME}$" || true)
           if [ -n "$EXISTING_ID" ]; then
-            sudo docker stop "$EXISTING_ID"
-            sudo docker rm "$EXISTING_ID"
+            sudo -n docker stop "$EXISTING_ID" || true
+            sudo -n docker rm "$EXISTING_ID" || true
           else
-            echo "No existing container named $CONTAINER_NAME"
+            echo "No existing container named ${CONTAINER_NAME}"
           fi
 
-          echo "==> Build image"
-          sudo docker build -t "$CONTAINER_NAME" .
+          echo "==> Remove ONLY image: ${IMAGE_REF} (if present)"
+          IMG_ID=$(sudo -n docker images -q "${IMAGE_REF}" || true)
+          if [ -n "$IMG_ID" ]; then
+            sudo -n docker rmi -f "$IMG_ID" || true
+          else
+            echo "No existing image ${IMAGE_REF}"
+          fi
 
-          echo "==> Run container"
-          sudo docker run -d \
+          echo "==> Build image ${IMAGE_REF}"
+          sudo -n docker build -t "${IMAGE_REF}" .
+
+          echo "==> Run container ${CONTAINER_NAME} from ${IMAGE_REF}"
+          sudo -n docker run -d \
             -p "$(portHttp)" \
             -p "$(portApi)" \
-            --name "$(imageName)" \
-            "$CONTAINER_NAME"
+            --name "${CONTAINER_NAME}" \
+            "${IMAGE_REF}"
+
+          echo "==> Containers now running:"
+          sudo -n docker ps
+
+          # Success if we reached here
+          exit 0
