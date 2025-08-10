@@ -9,7 +9,7 @@ resources:
     type: github
     endpoint: Github            # GitHub service connection name
     name: sunilkumarsukesan/pos-selenium-tests
-    ref: main                              # change if your default branch is different
+    ref: refs/heads/master                              # change if your default branch is different
 
 
 variables:
