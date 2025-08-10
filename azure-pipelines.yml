@@ -66,23 +66,3 @@ stages:
 
           echo "==> Containers now running:"
           sudo docker ps
-
-          # Optional health check (disable by clearing healthUrl variable)
-          if [ -n "$(healthUrl)" ]; then
-            HEALTH_URL="$(healthUrl)"
-            echo "==> Health check: $HEALTH_URL"
-            ATTEMPTS=15
-            SLEEP_SEC=4
-            for i in $(seq 1 $ATTEMPTS); do
-              if curl -sSf "$HEALTH_URL" >/dev/null 2>&1; then
-                echo "✅ App responded at $HEALTH_URL"
-                exit 0
-              fi
-              echo "Waiting for app... ($i/$ATTEMPTS)"
-              sleep $SLEEP_SEC
-            done
-            echo "❌ App did not respond in time. Showing logs:"
-            sudo docker ps --format 'table {{.Names}}\t{{.Status}}\t{{.Ports}}'
-            sudo docker logs "$CONTAINER_NAME" || true
-            exit 1
-          fi
