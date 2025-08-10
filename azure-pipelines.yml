@@ -37,7 +37,6 @@ stages:
           cd "$(remoteWorkDir)"
 
           CONTAINER_NAME="$(containerName)"
-          IMAGE_TAG="$(imageName):$(tag)"
 
           echo "==> Stop/remove ONLY the container named: $CONTAINER_NAME (if present)"
           EXISTING_ID=$(sudo docker ps -aq --filter "name=^${CONTAINER_NAME}$" || true)
@@ -46,14 +45,6 @@ stages:
             sudo docker rm "$EXISTING_ID"
           else
             echo "No existing container named $CONTAINER_NAME"
-          fi
-
-          echo "==> Remove ONLY the image: $IMAGE_TAG (if present)"
-          IMG_ID=$(sudo docker images -q "$IMAGE_TAG" || true)
-          if [ -n "$IMG_ID" ]; then
-            sudo docker rmi -f "$IMG_ID"
-          else
-            echo "No existing image $IMAGE_TAG"
           fi
 
           echo "==> Build image"
@@ -65,6 +56,3 @@ stages:
             -p "$(portApi)" \
             --name "$CONTAINER_NAME" \
             "$IMAGE_TAG"
-
-          echo "==> Containers now running:"
-          sudo docker ps
