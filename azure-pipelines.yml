@@ -23,13 +23,12 @@ stages:
     pool:
       vmImage: 'ubuntu-latest'
     steps:
-    - checkout: none  # not copying code; we assume VM already has Dockerfile in remoteWorkDir
-
     - task: SSH@0
       displayName: 'Build & run on VM'
       inputs:
         sshEndpoint: '$(sshServiceConnection)'
         runOptions: 'inline'
+        failOnStdErr: false
         inline: |
           set -e
 
